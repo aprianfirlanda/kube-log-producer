@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: spring-server
-          image: docker.io/aprianfirlanda/spring-log-producer:0.1.0
+          image: docker.io/aprianfirlanda/spring-log-producer:no-tag-9586501
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
