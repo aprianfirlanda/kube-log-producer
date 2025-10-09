@@ -1,0 +1,9 @@
+resources:
+  - namespaces/sikd-namespace.yaml
+  - apps/spring-server/deployment.yaml
+  - apps/spring-server/service.yaml
+  - apps/go-server/deployment.yaml
+  - apps/go-server/service.yaml
+  - apps/nodejs-server/deployment.yaml
+  - apps/nodejs-server/service.yaml
+  - ingress/sikd-ingress.yaml

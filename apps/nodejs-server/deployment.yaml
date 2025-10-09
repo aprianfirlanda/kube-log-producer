@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-server
+  namespace: sikd
+  labels:
+    app: nodejs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-server
+  template:
+    metadata:
+      name: nodejs-server
+      labels:
+        app: nodejs-server
+    spec:
+      containers:
+        - name: nodejs-server
+          image: docker.io/aprianfirlanda/nodejs-log-producer:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+      restartPolicy: Always
+      

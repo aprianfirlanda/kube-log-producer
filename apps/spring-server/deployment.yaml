@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-server
+  namespace: sikd
+  labels:
+    app: spring-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spring-server
+  template:
+    metadata:
+      name: spring-server
+      labels:
+        app: spring-server
+    spec:
+      containers:
+        - name: spring-server
+          image: docker.io/aprianfirlanda/spring-log-producer:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+      restartPolicy: Always
+      
