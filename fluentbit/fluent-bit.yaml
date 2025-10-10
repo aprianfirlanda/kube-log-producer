@@ -1,0 +1,225 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit
+  namespace: logging
+---
+# RBAC: allow Fluent Bit to enrich logs with Kubernetes metadata
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluent-bit
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluent-bit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluent-bit
+subjects:
+  - kind: ServiceAccount
+    name: fluent-bit
+    namespace: logging
+---
+# Output secrets (OpenSearch + S3)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: fluent-bit-outputs
+  namespace: logging
+type: Opaque
+stringData:
+  OPENSEARCH_HOST: "192.168.100.114"
+  OPENSEARCH_PORT: "9200"
+  OPENSEARCH_USER: "admin"
+  OPENSEARCH_PASSWORD: "Pratista17"
+  # S3/MinIO (dev)
+  S3_ENDPOINT: "${CI_MINIO_ENDPOINT}:39000"
+  S3_REGION: "us-east-1"
+  S3_BUCKET: "hiteman"
+  S3_ACCESS_KEY: "tabeldata"
+  S3_SECRET_KEY: "1eTqbgmJIRdy0ZZKp7fe"
+  S3_USE_SSL: "false"
+  S3_IGNORE_SSL: "true"
+  IMGPROXY_IGNORE_SSL_VERIFICATION: "true"
+  IMG_PROXY_SERVER: "${CI_MINIO_ENDPOINT}:31975"
+---
+# Fluent Bit config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+data:
+  # Main pipeline
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Daemon        Off
+        Log_Level     info
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+
+    # Tail only logs coming from the 'sikd' namespace by path pattern
+    # (works on containerd-based clusters where /var/log/containers contains namespace in filenames)
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*_sikd_*.log
+        Exclude_Path      /var/log/containers/fluent-bit-*.log
+        Tag               kube.*
+        Refresh_Interval  5
+        Skip_Long_Lines   On
+        Mem_Buf_Limit     64MB
+        DB                /var/log/fluentbit-sikd.db
+        DB.Sync           Normal
+        Read_From_Head    Off
+        Parser            cri
+
+    # Add Kubernetes metadata (pod, namespace, labels, etc.)
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Keep_Log            On
+        Annotations         Off
+
+    # Safety filter: keep only namespace=sikd (in case path matching differs across nodes)
+    [FILTER]
+        Name      grep
+        Match     kube.*
+        Regex     kubernetes.namespace_name  ^sikd$
+
+    # ---------- Output: OpenSearch ----------
+    [OUTPUT]
+        Name                es
+        Match               kube.*
+        Host                ${OPENSEARCH_HOST}
+        Port                ${OPENSEARCH_PORT}
+        HTTP_User           ${OPENSEARCH_USER}
+        HTTP_Passwd         ${OPENSEARCH_PASSWORD}
+        Logstash_Format     On
+        Logstash_Prefix     sikd
+        Replace_Dots        On
+        Type                _doc
+        Time_Key            @timestamp
+        Suppress_Type_Name  On
+        tls                 On
+        tls.verify          Off   # self-signed in your lab
+        Retry_Limit         False
+
+    # ---------- Output: S3 (MinIO today, NetApp S3 later) ----------
+    # This uses the built-in out_s3 plugin (AWS SDK). To switch to NetApp S3 later,
+    # change endpoint/creds only—no code changes needed.
+    [OUTPUT]
+        Name                 s3
+        Match                kube.*
+        bucket               ${S3_BUCKET}
+        region               ${S3_REGION}
+        total_file_size      50M
+        upload_timeout       2m
+        use_put_object       On
+        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
+        compression          gzip
+        endpoint             ${S3_ENDPOINT}
+        force_path_style     On
+        # TLS controls
+        tls                  ${S3_USE_SSL}
+        # Credentials
+        aws_key_id           ${S3_ACCESS_KEY}
+        aws_sec_key          ${S3_SECRET_KEY}
+        # If your endpoint uses custom/self-signed certs WITH TLS, you can set:
+        # tls.verify          Off
+
+  # Parsers (containerd CRI + a simple multiline for Java stack traces)
+  parsers.conf: |
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<flags>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    # Optional: Java stacktrace stitching (for Spring Boot), enable by adding 'Multiline.Parser java' in INPUT
+    [MULTILINE_PARSER]
+        Name          java
+        Type          regex
+        Flush_Timeout 2000
+        Rule          "start_state"   "/^\d{4}-\d{2}-\d{2}T/"  "cont"
+        Rule          "cont"          "/^\s+at\s|Caused by:/"  "cont"
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: logging
+  labels:
+    app: fluent-bit
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+    spec:
+      serviceAccountName: fluent-bit
+      priorityClassName: system-node-critical
+      containers:
+        - name: fluent-bit
+          image: cr.fluentbit.io/fluent/fluent-bit:2.2.2
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: fluent-bit-outputs
+          ports:
+            - name: metrics
+              containerPort: 2020
+              protocol: TCP
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlib
+              mountPath: /var/lib
+            - name: config
+              mountPath: /fluent-bit/etc/
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlib
+          hostPath:
+            path: /var/lib
+        - name: config
+          configMap:
+            name: fluent-bit-config
+            items:
+              - key: fluent-bit.conf
+                path: fluent-bit.conf
+              - key: parsers.conf
+                path: parsers.conf

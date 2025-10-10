@@ -7,3 +7,4 @@ resources:
   - apps/nodejs-server/deployment.yaml
   - apps/nodejs-server/service.yaml
   - ingress/sikd-ingress.yaml
+  - fluentbit/fluent-bit.yaml
