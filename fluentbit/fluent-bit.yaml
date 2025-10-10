@@ -131,20 +131,15 @@ data:
         Match                kube.*
         bucket               ${S3_BUCKET}
         region               ${S3_REGION}
+        endpoint             ${S3_ENDPOINT}      # keep http://... for MinIO, https://... for NetApp later
         total_file_size      50M
         upload_timeout       2m
         use_put_object       On
-        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
         compression          gzip
-        endpoint             ${S3_ENDPOINT}
-        force_path_style     On
-        # TLS controls
-        tls                  ${S3_USE_SSL}
-        # Credentials
+        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
+        auto_retry_requests  On
         aws_key_id           ${S3_ACCESS_KEY}
         aws_sec_key          ${S3_SECRET_KEY}
-        # If your endpoint uses custom/self-signed certs WITH TLS, you can set:
-        # tls.verify          Off
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
