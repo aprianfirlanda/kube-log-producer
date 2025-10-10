@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: nodejs-server
-          image: docker.io/aprianfirlanda/nodejs-log-producer:no-tag-1984d9b
+          image: docker.io/aprianfirlanda/nodejs-log-producer:0.1.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
