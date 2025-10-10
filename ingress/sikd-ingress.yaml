@@ -4,31 +4,31 @@ metadata:
   name: sikd
   namespace: sikd
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
 spec:
   ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /spring-server
-            pathType: Prefix
+          - path: /spring-server(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: spring-server
                 port:
                   number: 8080
-          - path: /go-server
-            pathType: Prefix
+          - path: /go-server(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: go-server
                 port:
                   number: 8080
-          - path: /nodejs-server
-            pathType: Prefix
+          - path: /nodejs-server(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: nodejs-server
                 port:
                   number: 8080
-
