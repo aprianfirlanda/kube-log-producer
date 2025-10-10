@@ -55,8 +55,6 @@ stringData:
   S3_SECRET_KEY: "1eTqbgmJIRdy0ZZKp7fe"
   S3_USE_SSL: "false"
   S3_IGNORE_SSL: "true"
-  IMGPROXY_IGNORE_SSL_VERIFICATION: "true"
-  IMG_PROXY_SERVER: "tabeldata.ip-dynamic.com:31975"
 ---
 # Fluent Bit config
 apiVersion: v1
