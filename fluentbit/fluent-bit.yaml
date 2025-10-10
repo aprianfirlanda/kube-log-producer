@@ -63,7 +63,6 @@ metadata:
   name: fluent-bit-config-v2
   namespace: logging
 data:
-  # Main pipeline
   fluent-bit.conf: |
     [SERVICE]
         Flush         1
@@ -74,8 +73,7 @@ data:
         HTTP_Listen   0.0.0.0
         HTTP_Port     2020
 
-    # Tail only logs coming from the 'sikd' namespace by path pattern
-    # (works on containerd-based clusters where /var/log/containers contains namespace in filenames)
+    # Tail only logs coming from the 'sikd' namespace
     [INPUT]
         Name              tail
         Path              /var/log/containers/*_sikd_*.log
@@ -89,7 +87,7 @@ data:
         Read_From_Head    Off
         Parser            cri
 
-    # Add Kubernetes metadata (pod, namespace, labels, etc.)
+    # Add Kubernetes metadata
     [FILTER]
         Name                kubernetes
         Match               kube.*
@@ -99,7 +97,7 @@ data:
         Keep_Log            On
         Annotations         Off
 
-    # Safety filter: keep only namespace=sikd (in case path matching differs across nodes)
+    # Keep only logs from namespace=sikd
     [FILTER]
         Name      grep
         Match     kube.*
@@ -120,26 +118,24 @@ data:
         Time_Key            @timestamp
         Suppress_Type_Name  On
         tls                 On
-        tls.verify          Off   # self-signed in your lab
+        tls.verify          Off
         Retry_Limit         False
 
     # ---------- Output: S3 (MinIO today, NetApp S3 later) ----------
-    # This uses the built-in out_s3 plugin (AWS SDK). To switch to NetApp S3 later,
-    # change endpoint/creds only—no code changes needed.
     [OUTPUT]
-        Name                 s3
-        Match                kube.*
-        bucket               ${S3_BUCKET}
-        region               ${S3_REGION}
-        endpoint             ${S3_ENDPOINT}      # keep http://... for MinIO, https://... for NetApp later
-        total_file_size      50M
-        upload_timeout       2m
-        use_put_object       On
-        compression          gzip
-        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
-        auto_retry_requests  On
-        aws_key_id           ${S3_ACCESS_KEY}
-        aws_sec_key          ${S3_SECRET_KEY}
+        Name                  s3
+        Match                 kube.*
+        bucket                ${S3_BUCKET}
+        region                ${S3_REGION}
+        endpoint              ${S3_ENDPOINT}      # http://... for MinIO, https://... for NetApp later
+        total_file_size       50M
+        upload_timeout        2m
+        use_put_object        On
+        compression           gzip
+        s3_key_format         /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
+        auto_retry_requests   On
+        aws_access_key_id     ${S3_ACCESS_KEY}
+        aws_secret_access_key ${S3_SECRET_KEY}
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
