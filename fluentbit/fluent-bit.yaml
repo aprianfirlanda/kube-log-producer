@@ -83,7 +83,6 @@ data:
         DB                /var/log/fluentbit-sikd-v2.db
         DB.Sync           Normal
         Read_From_Head    On
-        Parser            cri
 
     # Add Kubernetes metadata
     [FILTER]
