@@ -80,11 +80,17 @@ data:
         Refresh_Interval   1            # <- was 5
         Skip_Long_Lines    On
         Mem_Buf_Limit      64MB
+    
+        # Bigger per-line buffers (avoid drops on long lines)
         Buffer_Chunk_Size  512k
         Buffer_Max_Size    5M
+    
+        # Reset offsets + read existing lines once
         DB                 /var/log/fluentbit-sikd-v3.db   # <- was v2
         DB.Sync            Normal
         Read_From_Head     On
+    
+        # (intentionally no Parser while debugging)
 
     # Add Kubernetes metadata
     [FILTER]
