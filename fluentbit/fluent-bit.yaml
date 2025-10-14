@@ -80,9 +80,9 @@ data:
         Refresh_Interval  5
         Skip_Long_Lines   On
         Mem_Buf_Limit     64MB
-        DB                /var/log/fluentbit-sikd.db
+        DB                /var/log/fluentbit-sikd-v2.db
         DB.Sync           Normal
-        Read_From_Head    Off
+        Read_From_Head    On
         Parser            cri
 
     # Add Kubernetes metadata
