@@ -65,7 +65,7 @@ data:
     [SERVICE]
         Flush         1
         Daemon        Off
-        Log_Level     info
+        Log_Level     debug          # <- was info
         Parsers_File  parsers.conf
         HTTP_Server   On
         HTTP_Listen   0.0.0.0
@@ -73,16 +73,24 @@ data:
 
     # Tail only logs coming from the 'sikd' namespace
     [INPUT]
-        Name              tail
-        Path              /var/log/containers/*_sikd_*.log
-        Exclude_Path      /var/log/containers/fluent-bit-*.log
-        Tag               kube.*
-        Refresh_Interval  5
-        Skip_Long_Lines   On
-        Mem_Buf_Limit     64MB
-        DB                /var/log/fluentbit-sikd-v2.db
-        DB.Sync           Normal
-        Read_From_Head    On
+        Name               tail
+        Path               /var/log/containers/*_sikd_*.log
+        Exclude_Path       /var/log/containers/fluent-bit-*.log
+        Tag                kube.*
+        Refresh_Interval   1            # <- was 5
+        Skip_Long_Lines    On
+        Mem_Buf_Limit      64MB
+    
+        # Bigger per-line buffers (avoid drops on long lines)
+        Buffer_Chunk_Size  512k
+        Buffer_Max_Size    5M
+    
+        # Reset offsets + read existing lines once
+        DB                 /var/log/fluentbit-sikd-v3.db   # <- was v2
+        DB.Sync            Normal
+        Read_From_Head     On
+    
+        # (intentionally no Parser while debugging)
 
     # Add Kubernetes metadata
     [FILTER]
@@ -93,46 +101,47 @@ data:
         Merge_Log           On
         Keep_Log            On
         Annotations         Off
-
-    # Keep only logs from namespace=sikd
-    [FILTER]
-        Name      grep
-        Match     kube.*
-        Regex     kubernetes.namespace_name  ^sikd$
+                     
+     # (TEMP) comment out to rule out over-filtering; re-enable after confirming flow
+    # [FILTER]
+    #     Name      grep
+    #     Match     kube.*
+    #     Regex     kubernetes.namespace_name  ^sikd$
 
     # ---------- Output: OpenSearch ----------
     [OUTPUT]
-        Name                es
-        Match               kube.*
-        Host                ${OPENSEARCH_HOST}
-        Port                ${OPENSEARCH_PORT}
-        HTTP_User           ${OPENSEARCH_USER}
-        HTTP_Passwd         ${OPENSEARCH_PASSWORD}
-        Logstash_Format     On
-        Logstash_Prefix     sikd
-        Replace_Dots        On
-        Type                _doc
-        Time_Key            @timestamp
-        Suppress_Type_Name  On
-        tls                 On
-        tls.verify          Off
-        Retry_Limit         False
-        Trace_Error         On
+        Name                   es
+        Match                  kube.*
+        Host                   ${OPENSEARCH_HOST}
+        Port                   ${OPENSEARCH_PORT}
+        HTTP_User              ${OPENSEARCH_USER}
+        HTTP_Passwd            ${OPENSEARCH_PASSWORD}
+        Logstash_Format        On
+        Logstash_Prefix        sikd
+        Replace_Dots           On
+        Type                   _doc
+        Time_Key               @timestamp
+        Suppress_Type_Name     On
+        tls                    On
+        tls.verify             Off
+        Retry_Limit            False
+        Trace_Error            On
+        Log_Response_On_Error  On      # <- add this
 
     # ---------- Output: S3 (MinIO today, NetApp S3 later) ----------
     # Credentials are provided via env vars: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
     [OUTPUT]
-        Name                  s3
-        Match                 kube.*
-        bucket                ${S3_BUCKET}
-        region                ${S3_REGION}
-        endpoint              ${S3_ENDPOINT}      # http://... for MinIO, https://... for NetApp later
-        total_file_size       50M
-        upload_timeout        2m
-        use_put_object        On
-        compression           gzip
-        s3_key_format         /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
-        auto_retry_requests   On
+        Name                 s3
+        Match                kube.*
+        bucket               ${S3_BUCKET}
+        region               ${S3_REGION}
+        endpoint             ${S3_ENDPOINT}
+        total_file_size      5M        # <- was 50M (faster validation)
+        upload_timeout       30s       # <- was 2m  (faster validation)
+        use_put_object       On
+        compression          gzip
+        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
+        auto_retry_requests  On
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
