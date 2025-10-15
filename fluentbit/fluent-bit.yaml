@@ -58,81 +58,36 @@ stringData:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: fluent-bit-config-v2
+  name: fluent-bit-config
   namespace: logging
 data:
   fluent-bit.conf: |
     [SERVICE]
-        Flush         1
-        Daemon        Off
-        Log_Level     info
-        Parsers_File  parsers.conf
-        HTTP_Server   On
-        HTTP_Listen   0.0.0.0
-        HTTP_Port     2020
+    Flush         1
+    Daemon        Off
+    Log_Level     debug
+    Parsers_File  parsers.conf
+    HTTP_Server   On
+    HTTP_Listen   0.0.0.0
+    HTTP_Port     2020
 
-    # Tail only logs coming from the 'sikd' namespace
     [INPUT]
-        Name              tail
-        Path              /var/log/containers/*_sikd_*.log
-        Exclude_Path      /var/log/containers/fluent-bit-*.log
-        Tag               kube.*
-        Refresh_Interval  5
-        Skip_Long_Lines   On
-        Mem_Buf_Limit     64MB
-        DB                /var/log/fluentbit-sikd-v2.db
-        DB.Sync           Normal
-        Read_From_Head    On
+    Name               tail
+    Path               /var/log/containers/*_sikd_*.log
+    Exclude_Path       /var/log/containers/fluent-bit-*.log
+    Tag                kube.*
+    Refresh_Interval   1
+    Skip_Long_Lines    On
+    Mem_Buf_Limit      64MB
+    Buffer_Chunk_Size  512k
+    Buffer_Max_Size    5M
+    DB                 /var/log/fluentbit-sikd.db
+    DB.Sync            Normal
+    Read_From_Head     On
 
-    # Add Kubernetes metadata
-    [FILTER]
-        Name                kubernetes
-        Match               kube.*
-        Kube_URL            https://kubernetes.default.svc:443
-        Kube_Tag_Prefix     kube.var.log.containers.
-        Merge_Log           On
-        Keep_Log            On
-        Annotations         Off
-
-    # Keep only logs from namespace=sikd
-    [FILTER]
-        Name      grep
-        Match     kube.*
-        Regex     kubernetes.namespace_name  ^sikd$
-
-    # ---------- Output: OpenSearch ----------
     [OUTPUT]
-        Name                es
-        Match               kube.*
-        Host                ${OPENSEARCH_HOST}
-        Port                ${OPENSEARCH_PORT}
-        HTTP_User           ${OPENSEARCH_USER}
-        HTTP_Passwd         ${OPENSEARCH_PASSWORD}
-        Logstash_Format     On
-        Logstash_Prefix     sikd
-        Replace_Dots        On
-        Type                _doc
-        Time_Key            @timestamp
-        Suppress_Type_Name  On
-        tls                 On
-        tls.verify          Off
-        Retry_Limit         False
-        Trace_Error         On
-
-    # ---------- Output: S3 (MinIO today, NetApp S3 later) ----------
-    # Credentials are provided via env vars: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_REGION
-    [OUTPUT]
-        Name                  s3
-        Match                 kube.*
-        bucket                ${S3_BUCKET}
-        region                ${S3_REGION}
-        endpoint              ${S3_ENDPOINT}      # http://... for MinIO, https://... for NetApp later
-        total_file_size       50M
-        upload_timeout        2m
-        use_put_object        On
-        compression           gzip
-        s3_key_format         /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
-        auto_retry_requests   On
+    Name   stdout
+    Match  kube.*
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
@@ -220,7 +175,7 @@ spec:
             path: /var/lib
         - name: config
           configMap:
-            name: fluent-bit-config-v2
+            name: fluent-bit-config
             items:
               - key: fluent-bit.conf
                 path: fluent-bit.conf
