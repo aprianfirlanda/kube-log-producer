@@ -117,6 +117,19 @@ data:
         tls.verify             Off
         Retry_Limit            False
         Trace_Error            On
+    
+    [OUTPUT]
+        Name                 s3
+        Match                kube.*
+        bucket               ${S3_BUCKET}
+        region               ${S3_REGION}
+        endpoint             ${S3_ENDPOINT}
+        total_file_size      5M
+        upload_timeout       30s
+        use_put_object       On
+        compression          gzip
+        s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
+        auto_retry_requests  On
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
