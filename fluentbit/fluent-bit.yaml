@@ -117,7 +117,7 @@ data:
         tls.verify             Off
         Retry_Limit            False
         Trace_Error            On
-        Log_Response_On_Error  On
+        Trace_Output         On   # <- optional: VERY verbose request/response logging
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
