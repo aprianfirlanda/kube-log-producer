@@ -99,6 +99,25 @@ data:
     [OUTPUT]
         Name   stdout
         Match  kube.*
+    
+    [OUTPUT]
+        Name                   es
+        Match                  kube.*
+        Host                   ${OPENSEARCH_HOST}
+        Port                   ${OPENSEARCH_PORT}
+        HTTP_User              ${OPENSEARCH_USER}
+        HTTP_Passwd            ${OPENSEARCH_PASSWORD}
+        Logstash_Format        On
+        Logstash_Prefix        sikd
+        Replace_Dots           On
+        Type                   _doc
+        Time_Key               @timestamp
+        Suppress_Type_Name     On
+        tls                    On
+        tls.verify             Off
+        Retry_Limit            False
+        Trace_Error            On
+        Log_Response_On_Error  On
 
   # Parsers (containerd CRI + a simple multiline for Java stack traces)
   parsers.conf: |
