@@ -102,12 +102,28 @@ data:
         Remove  stream
 
     [FILTER]
-        Name    Modify
-        Match   kube.*
-        Remove  kubernetes['pod_id']
-        Remove  kubernetes['pod_ip']
-        Remove  kubernetes['docker_id']
-        Remove  kubernetes['container_hash']
+        Name          nest
+        Match         kube.*
+        Operation     lift
+        Nested_under  kubernetes
+        Add_prefix    k8s_
+
+    [FILTER]
+        Name   modify
+        Match  kube.*
+        Remove k8s_pod_id
+        Remove k8s_pod_name
+        Remove k8s_pod_ip
+        Remove k8s_docker_id
+        Remove k8s_container_hash
+
+    [FILTER]
+        Name           nest
+        Match          kube.*
+        Operation      nest
+        Wildcard       k8s_*
+        Nest_under     kubernetes
+        Remove_prefix  k8s_
 
     [OUTPUT]
         Name   stdout
