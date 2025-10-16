@@ -95,6 +95,20 @@ data:
         Labels              On
         Annotations         Off
 
+    [FILTER]
+        Name    Modify
+        Match   kube.*
+        Remove  time
+        Remove  stream
+
+    [FILTER]
+        Name    Modify
+        Match   kube.*
+        Remove  kubernetes['pod_id']
+        Remove  kubernetes['pod_ip']
+        Remove  kubernetes['docker_id']
+        Remove  kubernetes['container_hash']
+
     [OUTPUT]
         Name   stdout
         Match  kube.*
