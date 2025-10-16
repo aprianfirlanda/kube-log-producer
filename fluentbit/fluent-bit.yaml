@@ -9,7 +9,7 @@ metadata:
   name: fluent-bit
   namespace: logging
 ---
-# RBAC: allow Fluent Bit to enrich logs with Kubernetes metadata
+# RBAC (Role-Based Access Control): allow Fluent Bit to enrich logs with Kubernetes metadata
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -47,7 +47,6 @@ stringData:
   OPENSEARCH_PORT: "9200"
   OPENSEARCH_USER: "admin"
   OPENSEARCH_PASSWORD: "Pratista17"
-  # S3/MinIO (dev)
   S3_ENDPOINT: "http://tabeldata.ip-dynamic.com:39000"
   S3_REGION: "us-east-1"
   S3_BUCKET: "hiteman-log-management"
@@ -95,13 +94,14 @@ data:
         Keep_Log            On
         Labels              On
         Annotations         Off
-  
+
     [OUTPUT]
         Name   stdout
         Match  kube.*
-    
+
+    # OpenSearch (native plugin)
     [OUTPUT]
-        Name                   es
+        Name                   opensearch
         Match                  kube.*
         Host                   ${OPENSEARCH_HOST}
         Port                   ${OPENSEARCH_PORT}
@@ -110,14 +110,13 @@ data:
         Logstash_Format        On
         Logstash_Prefix        sikd
         Replace_Dots           On
-        Type                   _doc
-        Time_Key               @timestamp
         Suppress_Type_Name     On
         tls                    On
         tls.verify             Off
         Retry_Limit            False
         Trace_Error            On
-    
+
+    # S3 (Simple Storage Service / MinIO)
     [OUTPUT]
         Name                 s3
         Match                kube.*
@@ -131,7 +130,7 @@ data:
         s3_key_format        /sikd/%Y/%m/%d/%H/%M/%S-$UUID.gz
         auto_retry_requests  On
 
-  # Parsers (containerd CRI + a simple multiline for Java stack traces)
+  # Parsers (containerd CRI + optional Java multiline)
   parsers.conf: |
     [PARSER]
         Name        cri
@@ -140,13 +139,12 @@ data:
         Time_Key    time
         Time_Format %Y-%m-%dT%H:%M:%S.%L%z
 
-    # Optional: Java stacktrace stitching (for Spring Boot), enable by adding 'Multiline.Parser java' in INPUT
     [MULTILINE_PARSER]
         Name          java
         Type          regex
         Flush_Timeout 2000
-        Rule          "start_state"   "/^\d{4}-\d{2}-\d{2}T/"  "cont"
-        Rule          "cont"          "/^\s+at\s|Caused by:/"  "cont"
+        Rule          "start_state"   "/^\\d{4}-\\d{2}-\\d{2}T/"  "cont"
+        Rule          "cont"          "/^\\s+at\\s|Caused by:/"  "cont"
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -168,7 +166,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: fluent-bit
-          image: cr.fluentbit.io/fluent/fluent-bit:2.2.2
+          image: cr.fluentbit.io/fluent/fluent-bit:4.1.1
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
