@@ -187,6 +187,8 @@ spec:
                 name: fluent-bit-outputs
           # Map Secret keys to the AWS_* variables the S3 plugin picks up
           env:
+            - name: TZ
+              value: Asia/Jakarta
             - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
